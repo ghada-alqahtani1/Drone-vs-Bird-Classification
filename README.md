@@ -81,4 +81,4 @@ Pre-trained, lightweight models classify drones and birds very reliably, even wi
 
 Course: **IT 461 - Machine Learning**, King Saud University.
 
-This project was completed in 2026.
+
