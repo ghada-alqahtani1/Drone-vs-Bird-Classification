@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drone vs Bird Classifier</title>
+<meta name="description" content="Classify aerial images as drone or bird with a fine-tuned MobileNetV2, running entirely in your browser.">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #16191d; --muted: #5d6670; --border: #dde1e6;
+    --accent: #1f6feb; --drone: #1f6feb; --bird: #d9822b; --drop: #eef3fd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --card: #171b21; --text: #e8ebef; --muted: #9aa4ae; --border: #2a3038;
+      --accent: #5b9dff; --drone: #5b9dff; --bird: #f0a35a; --drop: #1a2230;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { margin: 0 0 6px; font-size: 1.8rem; letter-spacing: -0.01em; }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .drop { display: flex; align-items: center; justify-content: center; text-align: center;
+          min-height: 260px; border: 2px dashed var(--border); border-radius: 10px; cursor: pointer;
+          color: var(--muted); overflow: hidden; position: relative; }
+  .drop.over { border-color: var(--accent); background: var(--drop); }
+  .drop img { max-width: 100%; max-height: 320px; display: block; }
+  .examples { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+              color: var(--muted); font-size: 0.9rem; }
+  .examples button { border: 1px solid var(--border); background: transparent; border-radius: 8px;
+                     padding: 4px; cursor: pointer; }
+  .examples img { width: 72px; height: 50px; object-fit: cover; border-radius: 5px; display: block; }
+  .label { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
+  .verdict { font-size: 2rem; font-weight: 700; margin: 4px 0 16px; min-height: 3rem; }
+  .row { margin: 10px 0; }
+  .row-head { display: flex; justify-content: space-between; font-size: 0.95rem; }
+  .bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin-top: 4px; }
+  .fill { height: 100%; width: 0; border-radius: 5px; transition: width .35s ease; }
+  .status { color: var(--muted); font-size: 0.9rem; margin-top: 14px; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 0.9rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Drone vs Bird Classifier</h1>
+  <p class="sub">Upload an aerial image and a fine-tuned MobileNetV2 predicts whether it shows a drone or a bird. The model runs entirely in your browser, so your image is never uploaded.</p>
+
+  <div class="grid">
+    <section class="card">
+      <p class="label">Aerial image</p>
+      <label class="drop" id="drop">
+        <span id="hint">Click to choose an image<br>or drag one here</span>
+        <input type="file" id="file" accept="image/*" hidden>
+      </label>
+      <div class="examples">
+        <span>Try an example:</span>
+        <button type="button" data-src="examples/drone.jpg" aria-label="Drone example"><img src="examples/drone.jpg" alt="Drone example"></button>
+        <button type="button" data-src="examples/bird.jpg" aria-label="Bird example"><img src="examples/bird.jpg" alt="Bird example"></button>
+      </div>
+    </section>
+
+    <section class="card" aria-live="polite">
+      <p class="label">Prediction</p>
+      <div class="verdict" id="verdict">–</div>
+      <div class="row">
+        <div class="row-head"><span>Drone</span><span id="p-drone">–</span></div>
+        <div class="bar"><div class="fill" id="b-drone" style="background: var(--drone)"></div></div>
+      </div>
+      <div class="row">
+        <div class="row-head"><span>Bird</span><span id="p-bird">–</span></div>
+        <div class="bar"><div class="fill" id="b-bird" style="background: var(--bird)"></div></div>
+      </div>
+      <p class="status" id="status">Loading model…</p>
+    </section>
+  </div>
+
+  <footer>
+    Model: MobileNetV2 fine-tuned on the
+    <a href="https://www.kaggle.com/datasets/muhammadsaoodsarwar/drone-vs-bird" target="_blank" rel="noopener">Drone vs Bird dataset</a>
+    · 99.0% accuracy on a held-out test set ·
+    <a href="https://github.com/ghada-alqahtani1/Drone-vs-Bird-Classification" target="_blank" rel="noopener">Project on GitHub</a>
+  </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script>
+  const SIZE = 224;
+  const $ = (id) => document.getElementById(id);
+  const drop = $('drop'), fileInput = $('file'), status = $('status');
+  let session = null;
+
+  ort.env.wasm.numThreads = 1;
+
+  async function loadModel() {
+    try {
+      session = await ort.InferenceSession.create('model.onnx', { executionProviders: ['wasm'] });
+      status.textContent = 'Model ready. Choose an image.';
+    } catch (err) {
+      status.textContent = 'Could not load the model: ' + err.message;
+    }
+  }
+
+  // Same preprocessing as training: resize to 224x224, then MobileNetV2 scaling to [-1, 1]
+  function toTensor(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE; canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
+    const input = new Float32Array(SIZE * SIZE * 3);
+    for (let i = 0, j = 0; i < data.length; i += 4) {
+      input[j++] = data[i] / 127.5 - 1;
+      input[j++] = data[i + 1] / 127.5 - 1;
+      input[j++] = data[i + 2] / 127.5 - 1;
+    }
+    return new ort.Tensor('float32', input, [1, SIZE, SIZE, 3]);
+  }
+
+  function show(pDrone) {
+    const pBird = 1 - pDrone;
+    $('verdict').textContent = pDrone >= 0.5 ? 'Drone' : 'Bird';
+    $('p-drone').textContent = (pDrone * 100).toFixed(1) + '%';
+    $('p-bird').textContent = (pBird * 100).toFixed(1) + '%';
+    $('b-drone').style.width = (pDrone * 100) + '%';
+    $('b-bird').style.width = (pBird * 100) + '%';
+  }
+
+  async function classify(src) {
+    const img = new Image();
+    img.onload = async () => {
+      drop.innerHTML = '';
+      drop.appendChild(img);
+      drop.appendChild(fileInput);
+      if (!session) { status.textContent = 'Model is still loading, please wait…'; await modelReady; }
+      if (!session) return;
+      status.textContent = 'Classifying…';
+      const feeds = { [session.inputNames[0]]: toTensor(img) };
+      const out = await session.run(feeds);
+      show(out[session.outputNames[0]].data[0]);
+      status.textContent = 'Done. Choose another image to try again.';
+    };
+    img.onerror = () => { status.textContent = 'That file could not be read as an image.'; };
+    img.src = src;
+  }
+
+  function handleFile(file) {
+    if (file && file.type.startsWith('image/')) classify(URL.createObjectURL(file));
+  }
+
+  fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault(); drop.classList.remove('over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+  document.querySelectorAll('.examples button').forEach((b) =>
+    b.addEventListener('click', () => classify(b.dataset.src)));
+
+  const modelReady = loadModel();
+</script>
+</body>
+</html>
