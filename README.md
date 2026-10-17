@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://huggingface.co/spaces/ghada-alqahtani/drone-vs-bird-classifier">
-    <img src="https://img.shields.io/badge/Try%20the%20live%20demo-FF9D00?style=for-the-badge&logo=huggingface&logoColor=white" alt="Try the live demo">
+    <img src="https://img.shields.io/badge/Try%20the%20live%20demo-2563EB?style=for-the-badge&logo=huggingface&logoColor=white" alt="Try the live demo">
   </a>
 </p>
 
@@ -66,7 +66,9 @@ Full analysis, confusion matrices, and error analysis are in the [notebook](note
 
 ## 🧠 Conclusion
 
-Lightweight pre-trained models can classify drones and birds very reliably, even with a small dataset, and are small enough to run in a browser or on edge devices.
+Pre-trained, lightweight models classify drones and birds very reliably, even with a small dataset. MobileNetV2 is also designed for limited hardware, which suits drone-detection systems running on edge devices.
+
+**Limitations and next steps:** many images in the dataset are near-identical video frames, so a larger and more varied dataset would give a stronger test. Next steps include grouping frames by video before splitting and testing on footage from new environments.
 
 ---
 
