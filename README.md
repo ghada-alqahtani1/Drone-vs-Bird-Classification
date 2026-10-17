@@ -1,4 +1,4 @@
-<h1 align="center">🚁 Drone vs Bird: Aerial Object Classification</h1>
+<h1 align="center"> Drone vs Bird: Aerial Object Classification</h1>
 
 <p align="center"><b>Deep learning model that tells drones from birds in aerial images, with a live demo that runs in your browser</b></p>
 
