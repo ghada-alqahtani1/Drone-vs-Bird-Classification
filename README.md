@@ -74,7 +74,8 @@ Pre-trained, lightweight models classify drones and birds very reliably, even wi
 
 ## 👩‍💻 Team
 
-- Ghada Alqahtani       - Shahad Alotaibi        - Raghad Al-Qwaider           - Layan Murayshid
+- Ghada Alqahtani        - Layan Murayshid
+- Shahad Alotaibi        - Raghad Al-Qwaider        
 
 Course: **IT 461 - Machine Learning**, King Saud University.
 
